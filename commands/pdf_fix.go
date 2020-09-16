@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ONSdigital/dp-data-fix/out"
@@ -20,6 +21,8 @@ var (
 	masterDir   = "master"
 	pdfExt      = ".pdf"
 	dataJson    = "data.json"
+	timeseries  = "/timeseries"
+	pagePDF     = "page.pdf"
 	cutoffDate  = time.Date(2018, 9, 1, 00, 00, 0, 0, time.UTC)
 )
 
@@ -71,18 +74,12 @@ func findPDFsCMD() (*cobra.Command, error) {
 }
 
 func FindPDFs(zebedeeDir string) error {
-	out.InfoF("Finding user generated PDFs under: %s", zebedeeDir)
-
-	files, err := ioutil.ReadDir(zebedeeDir)
+	wd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	for _, f := range files {
-		if f.IsDir() {
-			out.InfoF("%s", f.Name())
-		}
-	}
+	out.InfoF("Finding user generated PDFs under: %s", wd)
 
 	masterDir := filepath.Join(zebedeeDir, masterDir)
 
@@ -102,7 +99,6 @@ func FindPDFs(zebedeeDir string) error {
 		return err
 	}
 
-
 	out.InfoF("searching for %s in %s", targetFile, masterDir)
 	if err := filepath.Walk(masterDir, walkPDFs(w, masterDir)); err != nil {
 		return err
@@ -120,7 +116,8 @@ func walkPDFs(w *csv.Writer, base string) filepath.WalkFunc {
 			return err
 		}
 
-		if info.IsDir() || filepath.Ext(p) != pdfExt || info.Name() != targetFile {
+		// skip if matches any of the following criteria
+		if info.IsDir() || strings.Contains(timeseries, p) || filepath.Ext(p) != pdfExt || pagePDF == info.Name() {
 			return nil
 		}
 
