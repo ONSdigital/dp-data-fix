@@ -17,6 +17,10 @@ func main() {
 }
 
 func run() error {
-	root := commands.GetRoot()
+	root, err := commands.NewCli()
+	if err != nil {
+		return err
+	}
+
 	return root.Execute()
 }
