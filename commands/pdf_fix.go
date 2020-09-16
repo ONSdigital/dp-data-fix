@@ -44,6 +44,7 @@ type Contact struct {
 
 type Row struct {
 	URI       string
+	Filename  string
 	Title     string
 	Date      string
 	Name      string
@@ -95,7 +96,7 @@ func FindPDFs(zebedeeDir string) error {
 	defer csvF.Close()
 
 	w := csv.NewWriter(csvF)
-	if err = w.Write([]string{"URI", "Title", "Name", "Email", "Telephone", "Date"}); err != nil {
+	if err = w.Write([]string{"URI", "Filename", "Title", "Name", "Email", "Telephone", "Date"}); err != nil {
 		return err
 	}
 
@@ -131,6 +132,7 @@ func walkPDFs(w *csv.Writer, base string) filepath.WalkFunc {
 
 			r := &Row{
 				URI:       uri,
+				Filename:  info.Name(),
 				Title:     "",
 				Date:      info.ModTime().Format(time.RFC822),
 				Name:      "",
@@ -197,5 +199,5 @@ func createCSV(p string) (*os.File, error) {
 }
 
 func (r *Row) Write(w *csv.Writer) error {
-	return w.Write([]string{r.URI, r.Title, r.Name, r.Email, r.Telephone, r.Date})
+	return w.Write([]string{r.URI, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.Date})
 }
