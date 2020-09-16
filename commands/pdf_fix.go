@@ -102,6 +102,8 @@ func FindPDFs(zebedeeDir string) error {
 		return err
 	}
 
+
+	out.InfoF("searching for %s in %s", targetFile, masterDir)
 	if err := filepath.Walk(masterDir, walkPDFs(w, masterDir)); err != nil {
 		return err
 	}
