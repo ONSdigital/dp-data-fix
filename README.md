@@ -20,6 +20,14 @@ sudo docker run -i -t --name dp-data-fix \
    -v <CONTENT_DIR>:<VOLUME_NAME>:rw \
    golang /bin/bash
 ```
+```
+sudo docker run -i -t --name dp-data-fix \
+   --userns=host \
+   -v /var/florence/zebedee:/content:rw \
+   golang /bin/bash
+
+ /var/florence/zebedee/
+```
 
 3. Update the container and install vim (always useful)
 ```

@@ -73,6 +73,17 @@ func findPDFsCMD() (*cobra.Command, error) {
 func FindPDFs(zebedeeDir string) error {
 	out.InfoF("Finding user generated PDFs under: %s", zebedeeDir)
 
+	files, err := ioutil.ReadDir(zebedeeDir)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			out.InfoF("%s", f.Name())
+		}
+	}
+
 	masterDir := filepath.Join(zebedeeDir, masterDir)
 
 	if !fileExists(masterDir) {
