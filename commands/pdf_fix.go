@@ -90,7 +90,7 @@ func FindPDFs(zebedeeDir string) error {
 		return fmt.Errorf("file does not exist %s", masterDir)
 	}
 
-	csvF, err := createCSV(outputFile)
+	csvF, err := createCSV(filepath.Join(zebedeeDir, outputFile))
 	if err != nil {
 		return err
 	}
@@ -195,6 +195,7 @@ func createCSV(p string) (*os.File, error) {
 		}
 	}
 
+	out.InfoF("creating output csv file %s", p)
 	return os.Create(p)
 }
 
