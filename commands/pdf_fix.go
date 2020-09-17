@@ -46,14 +46,15 @@ type Contact struct {
 }
 
 type Row struct {
-	URL         string
-	Filename    string
-	Title       string
-	ReleaseDate string
-	LastModDate time.Time
-	Name        string
-	Email       string
-	Telephone   string
+	URL            string
+	Filename       string
+	Title          string
+	ReleaseDateStr string
+	ReleaseDate    time.Time
+	LastModDate    time.Time
+	Name           string
+	Email          string
+	Telephone      string
 }
 
 func findPDFsCMD() (*cobra.Command, error) {
@@ -138,14 +139,15 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 		}
 
 		r := &Row{
-			URL:         fmt.Sprintf("%s/file?uri=%s", host, uri),
-			Filename:    info.Name(),
-			Title:       "",
-			ReleaseDate: "",
-			LastModDate: info.ModTime(), //.Format(time.RFC822),
-			Name:        "",
-			Email:       "",
-			Telephone:   "",
+			URL:            fmt.Sprintf("%s/file?uri=%s", host, uri),
+			Filename:       info.Name(),
+			Title:          "",
+			ReleaseDateStr: "",
+			ReleaseDate:    time.Now(),
+			LastModDate:    info.ModTime(), //.Format(time.RFC822),
+			Name:           "",
+			Email:          "",
+			Telephone:      "",
 		}
 
 		dataJson := filepath.Join(filepath.Dir(p), dataJson)
@@ -163,7 +165,18 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 		}
 
 		out.InfoF("PDF found: %s: %+v", info.Name(), info.ModTime())
-		if err := w.Write([]string{r.URL, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.ReleaseDate, r.LastModDate.Format(zebedeeTimeFmt)}); err != nil {
+
+		if err := w.Write(
+			[]string{
+				r.URL,
+				r.Filename,
+				r.Title,
+				r.Name,
+				r.Email,
+				r.Telephone,
+				r.ReleaseDate.Format(time.RFC1123),
+				r.LastModDate.Format(time.RFC1123),
+			}); err != nil {
 			return err
 		}
 
@@ -185,7 +198,7 @@ func extractPageData(p string, r *Row) error {
 
 		if p.Description != nil {
 			r.Title = p.Description.Title
-			r.ReleaseDate = p.Description.ReleaseDate
+			r.ReleaseDateStr = p.Description.ReleaseDate
 
 			if p.Description.Contact != nil {
 				r.Name = p.Description.Contact.Name
@@ -219,17 +232,14 @@ func createCSV(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
-func (r *Row) Write(w *csv.Writer) error {
-	return w.Write([]string{r.URL, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.ReleaseDate, r.LastModDate.Format(zebedeeTimeFmt)})
-}
-
 func IsBeforeCutoff(r *Row) (bool, error) {
-	if r.ReleaseDate != "" {
-		relDate, err := time.Parse(zebedeeTimeFmt, r.ReleaseDate)
+	if r.ReleaseDateStr != "" {
+		relDate, err := time.Parse(zebedeeTimeFmt, r.ReleaseDateStr)
 		if err != nil {
 			return false, err
 		}
 
+		r.ReleaseDate = relDate
 		return relDate.Before(cutoffDate), nil
 	}
 
