@@ -16,6 +16,7 @@ import (
 
 var (
 	zebedeeFlag = "zebedee"
+	domainFlag  = "domain"
 	targetFile  = "pdftables.pdf"
 	outputFile  = "pdftables.csv"
 	masterDir   = "master"
@@ -24,6 +25,7 @@ var (
 	timeseries  = "/timeseries"
 	pagePDF     = "page.pdf"
 	cutoffDate  = time.Date(2018, 9, 1, 00, 00, 0, 0, time.UTC)
+	headerRow   = []string{"URL", "Filename", "Title", "Name", "Email", "Telephone", "Date"}
 )
 
 type Page struct {
@@ -43,7 +45,7 @@ type Contact struct {
 }
 
 type Row struct {
-	URI       string
+	URL       string
 	Filename  string
 	Title     string
 	Date      string
@@ -57,16 +59,22 @@ func findPDFsCMD() (*cobra.Command, error) {
 		Use:   "pdfs",
 		Short: "todo",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mPath, err := cmd.Flags().GetString(zebedeeFlag)
+			zebedeeDir, err := cmd.Flags().GetString(zebedeeFlag)
 			if err != nil {
 				return err
 			}
 
-			return FindPDFs(mPath)
+			host, err := cmd.Flags().GetString(domainFlag)
+			if err != nil {
+				return err
+			}
+
+			return FindPDFs(zebedeeDir, host)
 		},
 	}
 
 	cmd.Flags().StringP(zebedeeFlag, "z", "", "The path for the root Zebedee directory (Required)")
+	cmd.Flags().StringP(domainFlag, "d", "http://www.ons.gov.uk", "The host of the instance being queried")
 	if err := cmd.MarkFlagRequired(zebedeeFlag); err != nil {
 		return nil, err
 	}
@@ -74,7 +82,7 @@ func findPDFsCMD() (*cobra.Command, error) {
 	return cmd, nil
 }
 
-func FindPDFs(zebedeeDir string) error {
+func FindPDFs(zebedeeDir, host string) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -96,12 +104,12 @@ func FindPDFs(zebedeeDir string) error {
 	defer csvF.Close()
 
 	w := csv.NewWriter(csvF)
-	if err = w.Write([]string{"URI", "Filename", "Title", "Name", "Email", "Telephone", "Date"}); err != nil {
+	if err = w.Write(headerRow); err != nil {
 		return err
 	}
 
 	out.InfoF("searching for %s in %s", targetFile, masterDir)
-	if err := filepath.Walk(masterDir, walkPDFs(w, masterDir)); err != nil {
+	if err := filepath.Walk(masterDir, walkPDFs(w, host, masterDir)); err != nil {
 		return err
 	}
 
@@ -111,7 +119,7 @@ func FindPDFs(zebedeeDir string) error {
 	return err
 }
 
-func walkPDFs(w *csv.Writer, base string) filepath.WalkFunc {
+func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 	return func(p string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -125,13 +133,15 @@ func walkPDFs(w *csv.Writer, base string) filepath.WalkFunc {
 		if info.ModTime().After(cutoffDate) {
 			out.InfoF("PDF found: %s: %+v", info.Name(), info.ModTime())
 
-			uri, err := filepath.Rel(base, filepath.Dir(p))
+			uri, err := filepath.Rel(base, p)
 			if err != nil {
 				return err
 			}
 
+			url := fmt.Sprintf("%s/file?uri=%s", host, uri)
+
 			r := &Row{
-				URI:       uri,
+				URL:       url,
 				Filename:  info.Name(),
 				Title:     "",
 				Date:      info.ModTime().Format(time.RFC822),
@@ -145,7 +155,7 @@ func walkPDFs(w *csv.Writer, base string) filepath.WalkFunc {
 				return err
 			}
 
-			r.Write(w)
+			w.Write([]string{r.URL, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.Date})
 		}
 
 		return nil
@@ -196,8 +206,4 @@ func createCSV(p string) (*os.File, error) {
 
 	out.InfoF("creating output csv file %s", p)
 	return os.Create(p)
-}
-
-func (r *Row) Write(w *csv.Writer) error {
-	return w.Write([]string{r.URI, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.Date})
 }
