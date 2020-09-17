@@ -15,17 +15,17 @@ import (
 )
 
 var (
-	zebedeeFlag = "zebedee"
-	domainFlag  = "domain"
-	targetFile  = "pdftables.pdf"
-	outputFile  = "pdftables.csv"
-	masterDir   = "master"
-	pdfExt      = ".pdf"
-	dataJson    = "data.json"
-	timeseries  = "/timeseries"
-	pagePDF     = "page.pdf"
-	cutoffDate  = time.Date(2018, 9, 1, 00, 00, 0, 0, time.UTC)
-	headerRow   = []string{"URL", "Filename", "Title", "Name", "Email", "Telephone", "Date"}
+	zebedeeFlag    = "zebedee"
+	domainFlag     = "domain"
+	outputFile     = "pdftables.csv"
+	masterDir      = "master"
+	pdfExt         = ".pdf"
+	dataJson       = "data.json"
+	timeseries     = "/timeseries"
+	pagePDF        = "page.pdf"
+	zebedeeTimeFmt = "2006-01-02T15:04:05.000Z"
+	cutoffDate     = time.Date(2018, 9, 1, 00, 00, 0, 0, time.UTC) //.Add(time.Duration(-1) * time.Millisecond)
+	headerRow      = []string{"URL", "Filename", "Title", "Name", "Email", "Telephone", "Release Date", "Last Modified Date"}
 )
 
 type Page struct {
@@ -34,8 +34,9 @@ type Page struct {
 }
 
 type Description struct {
-	Title   string   `json:"title"`
-	Contact *Contact `json:"contact"`
+	ReleaseDate string   `json:"releaseDate"`
+	Title       string   `json:"title"`
+	Contact     *Contact `json:"contact"`
 }
 
 type Contact struct {
@@ -45,13 +46,14 @@ type Contact struct {
 }
 
 type Row struct {
-	URL       string
-	Filename  string
-	Title     string
-	Date      string
-	Name      string
-	Email     string
-	Telephone string
+	URL         string
+	Filename    string
+	Title       string
+	ReleaseDate string
+	LastModDate time.Time
+	Name        string
+	Email       string
+	Telephone   string
 }
 
 func findPDFsCMD() (*cobra.Command, error) {
@@ -108,7 +110,7 @@ func FindPDFs(zebedeeDir, host string) error {
 		return err
 	}
 
-	out.InfoF("searching for %s in %s", targetFile, masterDir)
+	out.InfoF("searching for user generated PDFs in %s", masterDir)
 	if err := filepath.Walk(masterDir, walkPDFs(w, host, masterDir)); err != nil {
 		return err
 	}
@@ -130,32 +132,39 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 			return nil
 		}
 
-		if info.ModTime().After(cutoffDate) {
-			out.InfoF("PDF found: %s: %+v", info.Name(), info.ModTime())
+		uri, err := filepath.Rel(base, p)
+		if err != nil {
+			return err
+		}
 
-			uri, err := filepath.Rel(base, p)
-			if err != nil {
-				return err
-			}
+		r := &Row{
+			URL:         fmt.Sprintf("%s/file?uri=%s", host, uri),
+			Filename:    info.Name(),
+			Title:       "",
+			ReleaseDate: "",
+			LastModDate: info.ModTime(), //.Format(time.RFC822),
+			Name:        "",
+			Email:       "",
+			Telephone:   "",
+		}
 
-			url := fmt.Sprintf("%s/file?uri=%s", host, uri)
+		dataJson := filepath.Join(filepath.Dir(p), dataJson)
+		if err = extractPageData(dataJson, r); err != nil {
+			return err
+		}
 
-			r := &Row{
-				URL:       url,
-				Filename:  info.Name(),
-				Title:     "",
-				Date:      info.ModTime().Format(time.RFC822),
-				Name:      "",
-				Email:     "",
-				Telephone: "",
-			}
+		isBefore, err := IsBeforeCutoff(r)
+		if err != nil {
+			return err
+		}
 
-			dataJson := filepath.Join(filepath.Dir(p), dataJson)
-			if err = extractPageData(dataJson, r); err != nil {
-				return err
-			}
+		if isBefore {
+			return nil
+		}
 
-			w.Write([]string{r.URL, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.Date})
+		out.InfoF("PDF found: %s: %+v", info.Name(), info.ModTime())
+		if err := w.Write([]string{r.URL, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.ReleaseDate, r.LastModDate.Format(zebedeeTimeFmt)}); err != nil {
+			return err
 		}
 
 		return nil
@@ -176,11 +185,13 @@ func extractPageData(p string, r *Row) error {
 
 		if p.Description != nil {
 			r.Title = p.Description.Title
+			r.ReleaseDate = p.Description.ReleaseDate
 
 			if p.Description.Contact != nil {
 				r.Name = p.Description.Contact.Name
 				r.Email = p.Description.Contact.Email
 				r.Telephone = p.Description.Contact.Telephone
+
 			}
 		}
 	}
@@ -206,4 +217,21 @@ func createCSV(p string) (*os.File, error) {
 
 	out.InfoF("creating output csv file %s", p)
 	return os.Create(p)
+}
+
+func (r *Row) Write(w *csv.Writer) error {
+	return w.Write([]string{r.URL, r.Filename, r.Title, r.Name, r.Email, r.Telephone, r.ReleaseDate, r.LastModDate.Format(zebedeeTimeFmt)})
+}
+
+func IsBeforeCutoff(r *Row) (bool, error) {
+	if r.ReleaseDate != "" {
+		relDate, err := time.Parse(zebedeeTimeFmt, r.ReleaseDate)
+		if err != nil {
+			return false, err
+		}
+
+		return relDate.Before(cutoffDate), nil
+	}
+
+	return r.LastModDate.Before(cutoffDate), nil
 }
