@@ -166,17 +166,15 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 
 		out.InfoF("PDF found: %s: %+v", info.Name(), info.ModTime())
 
-		if err := w.Write(
-			[]string{
-				r.URL,
-				r.Filename,
-				r.Title,
-				r.Name,
-				r.Email,
-				r.Telephone,
-				r.ReleaseDate.Format(time.RFC1123),
-				r.LastModDate.Format(time.RFC1123),
-			}); err != nil {
+		releaseDate := ""
+		if r.ReleaseDateStr != "" {
+			releaseDate = r.ReleaseDate.Format(time.RFC1123)
+		}
+
+		lostModifiedDate := r.LastModDate.Format(time.RFC1123)
+
+		rowData := []string{r.URL, r.Filename, r.Title, r.Name, r.Email, r.Telephone, releaseDate, lostModifiedDate}
+		if err := w.Write(rowData); err != nil {
 			return err
 		}
 
