@@ -17,7 +17,7 @@ import (
 var (
 	zebedeeFlag    = "zebedee"
 	domainFlag     = "domain"
-	outputFile     = "pdftables.csv"
+	filenameFlag       = "filename"
 	masterDir      = "master"
 	pdfExt         = ".pdf"
 	dataJson       = "data.json"
@@ -73,12 +73,18 @@ func findPDFsCMD() (*cobra.Command, error) {
 				return err
 			}
 
-			return FindPDFs(zebedeeDir, host)
+			filename, err := cmd.Flags().GetString(filenameFlag)
+			if err != nil {
+				return err
+			}
+
+			return FindPDFs(zebedeeDir, host, filename)
 		},
 	}
 
 	cmd.Flags().StringP(zebedeeFlag, "z", "", "The path for the root Zebedee directory (Required)")
 	cmd.Flags().StringP(domainFlag, "d", "http://www.ons.gov.uk", "The host of the instance being queried")
+	cmd.Flags().StringP(filenameFlag, "f", "user-generated-pdfs.csv", "The CVS file name")
 	if err := cmd.MarkFlagRequired(zebedeeFlag); err != nil {
 		return nil, err
 	}
@@ -86,7 +92,7 @@ func findPDFsCMD() (*cobra.Command, error) {
 	return cmd, nil
 }
 
-func FindPDFs(zebedeeDir, host string) error {
+func FindPDFs(zebedeeDir, host, filename string) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -100,7 +106,7 @@ func FindPDFs(zebedeeDir, host string) error {
 		return fmt.Errorf("file does not exist %s", masterDir)
 	}
 
-	csvF, err := createCSV(filepath.Join(zebedeeDir, outputFile))
+	csvF, err := createCSV(filepath.Join(zebedeeDir, filename))
 	if err != nil {
 		return err
 	}
