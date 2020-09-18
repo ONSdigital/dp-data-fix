@@ -181,21 +181,21 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 	}
 }
 
-func extractPageData(p string, data *Data) error {
-	if fileExists(p) {
-		b, err := ioutil.ReadFile(p)
+func extractPageData(path string, data *Data) error {
+	if fileExists(path) {
+		b, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
 		}
 
-		var p Page
-		if err = json.Unmarshal(b, &p); err != nil {
+		var page Page
+		if err = json.Unmarshal(b, &page); err != nil {
 			return err
 		}
 
-		if p.Description != nil {
-			data.Title = p.Description.Title
-			data.ReleaseDateStr = p.Description.ReleaseDate
+		if page.Description != nil {
+			data.Title = page.Description.Title
+			data.ReleaseDateStr = page.Description.ReleaseDate
 
 			if data.ReleaseDateStr != "" {
 				t, err := time.Parse(zebedeeTimeFmt, data.ReleaseDateStr)
@@ -204,12 +204,13 @@ func extractPageData(p string, data *Data) error {
 				}
 
 				data.ReleaseDateStr = t.Format(time.RFC1123)
+				data.ReleaseDate = t
 			}
 
-			if p.Description.Contact != nil {
-				data.Name = p.Description.Contact.Name
-				data.Email = p.Description.Contact.Email
-				data.Telephone = p.Description.Contact.Telephone
+			if page.Description.Contact != nil {
+				data.Name = page.Description.Contact.Name
+				data.Email = page.Description.Contact.Email
+				data.Telephone = page.Description.Contact.Telephone
 
 			}
 		}
