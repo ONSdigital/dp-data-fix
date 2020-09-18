@@ -24,7 +24,7 @@ var (
 	timeseries     = "/timeseries"
 	pagePDF        = "page.pdf"
 	zebedeeTimeFmt = "2006-01-02T15:04:05.000Z"
-	cutoffDate     = time.Date(2018, 9, 1, 00, 00, 0, 0, time.UTC) //.Add(time.Duration(-1) * time.Millisecond)
+	cutoffDate     = time.Date(2018, 9, 1, 00, 00, 0, 0, time.UTC)
 	headerRow      = []string{"URL", "Filename", "Title", "Name", "Email", "Telephone", "Release Date", "Last Modified Date"}
 )
 
@@ -120,7 +120,7 @@ func FindPDFs(zebedeeDir, host string) error {
 	w.Flush()
 
 	out.InfoF("Generated results csv file: %s", outputFile)
-	return err
+	return nil
 }
 
 func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
@@ -157,12 +157,7 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 			return err
 		}
 
-		isBefore, err := IsBeforeCutoff(data)
-		if err != nil {
-			return err
-		}
-
-		if isBefore {
+		if IsBeforeCutoff(data) {
 			return nil
 		}
 
@@ -203,7 +198,12 @@ func extractPageData(p string, data *Data) error {
 			data.ReleaseDateStr = p.Description.ReleaseDate
 
 			if data.ReleaseDateStr != "" {
-				data.ReleaseDateStr = data.ReleaseDate.Format(time.RFC1123)
+				t, err := time.Parse(zebedeeTimeFmt, data.ReleaseDateStr)
+				if err != nil {
+					return err
+				}
+
+				data.ReleaseDateStr = t.Format(time.RFC1123)
 			}
 
 			if p.Description.Contact != nil {
@@ -238,16 +238,10 @@ func createCSV(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
-func IsBeforeCutoff(d *Data) (bool, error) {
+func IsBeforeCutoff(d *Data) bool {
 	if d.ReleaseDateStr != "" {
-		relDate, err := time.Parse(zebedeeTimeFmt, d.ReleaseDateStr)
-		if err != nil {
-			return false, err
-		}
-
-		d.ReleaseDate = relDate
-		return relDate.Before(cutoffDate), nil
+		return d.ReleaseDate.Before(cutoffDate)
 	}
 
-	return d.LastModDate.Before(cutoffDate), nil
+	return d.LastModDate.Before(cutoffDate)
 }
