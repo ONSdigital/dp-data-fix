@@ -125,7 +125,7 @@ func FindPDFs(zebedeeDir, host, filename string) error {
 
 	w.Flush()
 
-	out.InfoF("Generated results csv file: %s", outputFile)
+	out.InfoF("Generated results csv file: %s", filename)
 	return nil
 }
 
