@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 var (
 	zebedeeFlag    = "zebedee"
 	domainFlag     = "domain"
-	filenameFlag       = "filename"
+	filenameFlag   = "filename"
 	masterDir      = "master"
 	pdfExt         = ".pdf"
 	dataJson       = "data.json"
@@ -25,38 +26,8 @@ var (
 	pagePDF        = "page.pdf"
 	zebedeeTimeFmt = "2006-01-02T15:04:05.000Z"
 	cutoffDate     = time.Date(2018, 9, 1, 00, 00, 0, 0, time.UTC)
-	headerRow      = []string{"URL", "Filename", "Title", "Name", "Email", "Telephone", "Release Date", "Last Modified Date"}
+	headerRow      = []string{"URL", "Filename", "Title", "Name", "Email", "Telephone", "Release Date", "Last Modified Date", "PDF Table"}
 )
-
-type Page struct {
-	URI         string       `json:"uri"`
-	Description *Description `json:"description"`
-}
-
-type Description struct {
-	ReleaseDate string   `json:"releaseDate"`
-	Title       string   `json:"title"`
-	Contact     *Contact `json:"contact"`
-}
-
-type Contact struct {
-	Email     string `json:"email"`
-	Name      string `json:"name"`
-	Telephone string `json:"telephone"`
-}
-
-type Data struct {
-	URL            string
-	Filename       string
-	Title          string
-	Name           string
-	Email          string
-	Telephone      string
-	ReleaseDate    time.Time
-	ReleaseDateStr string
-	LastModDate    time.Time
-	LastModDateStr string
-}
 
 func findPDFsCMD() (*cobra.Command, error) {
 	cmd := &cobra.Command{
@@ -156,6 +127,7 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 			ReleaseDate:    time.Now(),
 			LastModDate:    info.ModTime(),
 			LastModDateStr: info.ModTime().Format(time.RFC1123),
+			IsPDFTable:     false,
 		}
 
 		dataJson := filepath.Join(filepath.Dir(p), dataJson)
@@ -163,7 +135,7 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 			return err
 		}
 
-		if IsBeforeCutoff(data) {
+		if data.IsBeforeCutoff() {
 			return nil
 		}
 
@@ -178,7 +150,9 @@ func walkPDFs(w *csv.Writer, host, base string) filepath.WalkFunc {
 			data.Telephone,
 			data.ReleaseDateStr,
 			data.LastModDateStr,
+			strconv.FormatBool(data.IsPDFTable),
 		}
+
 		if err := w.Write(rowData); err != nil {
 			return err
 		}
@@ -220,6 +194,15 @@ func extractPageData(path string, data *Data) error {
 
 			}
 		}
+
+		if page.PDFTables != nil && len(page.PDFTables) >= 1 {
+			for _, val := range page.PDFTables {
+				if val.File == data.Filename {
+					data.IsPDFTable = true
+					break
+				}
+			}
+		}
 	}
 
 	return nil
@@ -245,7 +228,7 @@ func createCSV(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
-func IsBeforeCutoff(d *Data) bool {
+func (d *Data) IsBeforeCutoff() bool {
 	if d.ReleaseDateStr != "" {
 		return d.ReleaseDate.Before(cutoffDate)
 	}
