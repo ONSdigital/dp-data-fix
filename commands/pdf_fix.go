@@ -229,9 +229,9 @@ func createCSV(p string) (*os.File, error) {
 }
 
 func (d *Data) IsBeforeCutoff() bool {
-	if d.ReleaseDateStr != "" {
+/*	if d.ReleaseDateStr != "" {
 		return d.ReleaseDate.Before(cutoffDate)
-	}
+	}*/
 
 	return d.LastModDate.Before(cutoffDate)
 }
